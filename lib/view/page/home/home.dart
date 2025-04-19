@@ -2,6 +2,7 @@ import 'package:fl_lib/fl_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:server_box/core/chan.dart';
 import 'package:server_box/data/model/app/tab.dart';
+import 'package:server_box/data/model/window_size.dart';
 import 'package:server_box/data/provider/app.dart';
 import 'package:server_box/data/provider/server.dart';
 import 'package:server_box/data/res/build_data.dart';
@@ -26,7 +27,7 @@ class _HomePageState extends State<HomePage>
   late final PageController _pageController;
 
   final _selectIndex = ValueNotifier(0);
-  final _isLandscape = ValueNotifier(false);
+  final _windowSize = ValueNotifier(WindowSize.compact);
 
   bool _switchingPage = false;
   bool _shouldAuth = false;
@@ -40,7 +41,7 @@ class _HomePageState extends State<HomePage>
     WakelockPlus.disable();
 
     _selectIndex.dispose();
-    _isLandscape.dispose();
+    _windowSize.dispose();
   }
 
   @override
@@ -61,8 +62,7 @@ class _HomePageState extends State<HomePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _isLandscape.value =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    _windowSize.value = getWindowSize(context);
   }
 
   @override
@@ -103,30 +103,37 @@ class _HomePageState extends State<HomePage>
     final sysPadding = MediaQuery.of(context).padding;
     final navigationBg = Theme.of(context).colorScheme.surfaceContainer;
 
-    return Row(
-      children: [
-        if (_isLandscape.value) _buildNavigationRail(navigationBg),
-        Expanded(
-          child: Scaffold(
-              appBar: _AppBar(sysPadding.top),
-              body: PageView.builder(
-                controller: _pageController,
-                itemCount: AppTab.values.length,
-                physics: const NeverScrollableScrollPhysics(),
-                scrollDirection:
-                    _isLandscape.value ? Axis.vertical : Axis.horizontal,
-                itemBuilder: (_, index) => AppTab.values[index].page,
-                onPageChanged: (value) {
-                  FocusScope.of(context).unfocus();
-                  if (!_switchingPage) {
-                    _selectIndex.value = value;
-                  }
-                },
-              ),
-              bottomNavigationBar:
-                  _isLandscape.value ? null : _buildBottomBar()),
-        ),
-      ],
+    return ValBuilder(
+      listenable: _windowSize,
+      builder: (window) {
+        return Row(
+          children: [
+            if (window != WindowSize.compact)
+              _buildNavigationRail(navigationBg, window == WindowSize.expanded),
+            Expanded(
+              child: Scaffold(
+                  appBar: _AppBar(sysPadding.top),
+                  body: PageView.builder(
+                    controller: _pageController,
+                    itemCount: AppTab.values.length,
+                    physics: const NeverScrollableScrollPhysics(),
+                    scrollDirection: window != WindowSize.compact
+                        ? Axis.vertical
+                        : Axis.horizontal,
+                    itemBuilder: (_, index) => AppTab.values[index].page,
+                    onPageChanged: (value) {
+                      FocusScope.of(context).unfocus();
+                      if (!_switchingPage) {
+                        _selectIndex.value = value;
+                      }
+                    },
+                  ),
+                  bottomNavigationBar:
+                      window == WindowSize.compact ? _buildBottomBar() : null),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -139,14 +146,15 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildNavigationRail(Color color) {
+  Widget _buildNavigationRail(Color color, bool expanded) {
     return NavigationRail(
       destinations: AppTab.navRailDestinations,
       selectedIndex: _selectIndex.value,
       onDestinationSelected: _onDestinationSelected,
       backgroundColor: color,
+      extended: expanded,
       groupAlignment: 0,
-      labelType: NavigationRailLabelType.all,
+      labelType: expanded ? null : NavigationRailLabelType.all,
     );
   }
 
