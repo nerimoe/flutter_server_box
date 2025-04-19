@@ -101,58 +101,67 @@ class _HomePageState extends State<HomePage>
     super.build(context);
     AppProvider.ctx = context;
     final sysPadding = MediaQuery.of(context).padding;
+    final navigationBg = Theme.of(context).colorScheme.surfaceContainer;
 
-    return Scaffold(
-      appBar: _AppBar(sysPadding.top),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: AppTab.values.length,
-        physics: const NeverScrollableScrollPhysics(),
-        itemBuilder: (_, index) => AppTab.values[index].page,
-        onPageChanged: (value) {
-          FocusScope.of(context).unfocus();
-          if (!_switchingPage) {
-            _selectIndex.value = value;
-          }
-        },
-      ),
-      bottomNavigationBar: ValBuilder(
-        listenable: _isLandscape,
-        builder: (ls) {
-          return Stores.setting.fullScreen.fetch()
-              ? UIs.placeholder
-              : ListenableBuilder(
-                  listenable: _selectIndex,
-                  builder: (_, __) => _buildBottomBar(ls),
-                );
-        },
-      ),
+    return Row(
+      children: [
+        if (_isLandscape.value) _buildNavigationRail(navigationBg),
+        Expanded(
+          child: Scaffold(
+              appBar: _AppBar(sysPadding.top),
+              body: PageView.builder(
+                controller: _pageController,
+                itemCount: AppTab.values.length,
+                physics: const NeverScrollableScrollPhysics(),
+                scrollDirection:
+                    _isLandscape.value ? Axis.vertical : Axis.horizontal,
+                itemBuilder: (_, index) => AppTab.values[index].page,
+                onPageChanged: (value) {
+                  FocusScope.of(context).unfocus();
+                  if (!_switchingPage) {
+                    _selectIndex.value = value;
+                  }
+                },
+              ),
+              bottomNavigationBar:
+                  _isLandscape.value ? null : _buildBottomBar()),
+        ),
+      ],
     );
   }
 
-  Widget _buildBottomBar(bool ls) {
+  Widget _buildBottomBar() {
     return NavigationBar(
       selectedIndex: _selectIndex.value,
-      height: kBottomNavigationBarHeight * (ls ? 0.75 : 1.1),
       animationDuration: const Duration(milliseconds: 250),
-      onDestinationSelected: (int index) {
-        if (_selectIndex.value == index) return;
-        _selectIndex.value = index;
-        _switchingPage = true;
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 677),
-          curve: Curves.fastLinearToSlowEaseIn,
-        );
-        Future.delayed(const Duration(milliseconds: 677), () {
-          _switchingPage = false;
-        });
-      },
-      labelBehavior: ls
-          ? NavigationDestinationLabelBehavior.alwaysHide
-          : NavigationDestinationLabelBehavior.onlyShowSelected,
+      onDestinationSelected: _onDestinationSelected,
       destinations: AppTab.navDestinations,
     );
+  }
+
+  Widget _buildNavigationRail(Color color) {
+    return NavigationRail(
+      destinations: AppTab.navRailDestinations,
+      selectedIndex: _selectIndex.value,
+      onDestinationSelected: _onDestinationSelected,
+      backgroundColor: color,
+      groupAlignment: 0,
+      labelType: NavigationRailLabelType.all,
+    );
+  }
+
+  void _onDestinationSelected(int index) {
+    if (_selectIndex.value == index) return;
+    setState(() => _selectIndex.value = index);
+    _switchingPage = true;
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 677),
+      curve: Curves.fastLinearToSlowEaseIn,
+    );
+    Future.delayed(const Duration(milliseconds: 677), () {
+      _switchingPage = false;
+    });
   }
 
   @override
